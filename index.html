@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Restaurant Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- Pantalla de acceso -->
+  <section id="pantalla-login" class="login">
+    <div class="login__caja">
+      <h1 class="logo">Restaurant Manager</h1>
+      <p class="login__sub">Elige cómo quieres ingresar</p>
+      <div class="roles">
+        <button type="button" class="rol activa" data-rol="empleado">Empleado</button>
+        <button type="button" class="rol" data-rol="admin">Administrador</button>
+      </div>
+      <div class="modos">
+        <button type="button" class="modo-btn activa" data-modo="entrar">Iniciar sesión</button>
+        <button type="button" class="modo-btn" data-modo="crear">Crear usuario</button>
+      </div>
+      <form id="form-login">
+        <label>Usuario<input id="usuario" required autocomplete="username"></label>
+        <label>Contraseña<input id="clave" type="password" required minlength="4" autocomplete="current-password"></label>
+        <p id="error" class="error" role="alert"></p>
+        <button class="btn" id="btn-enviar">Ingresar</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- Aplicación -->
+  <div id="app" hidden>
+    <header class="header">
+      <div class="contenedor header__contenido">
+        <h1 class="logo">Restaurant Manager</h1>
+        <div class="reloj">
+          <span id="usuario-chip" class="usuario-chip"></span>
+          <span id="fecha" class="reloj__fecha"></span>
+          <span id="hora" class="reloj__hora"></span>
+          <button id="btn-salir" class="btn-salir">Salir</button>
+        </div>
+      </div>
+    </header>
+
+    <nav class="nav">
+      <div id="nav-tabs" class="contenedor nav__contenido"></div>
+    </nav>
+
+    <main class="contenedor principal">
+
+      <section id="vista-mesas" class="vista">
+        <div class="encabezado-vista">
+          <h2>Estado de Mesas</h2>
+          <div class="leyenda">
+            <span class="leyenda__item"><i class="punto punto--libre"></i>Libre</span>
+            <span class="leyenda__item"><i class="punto punto--ocupada"></i>Ocupada</span>
+          </div>
+        </div>
+        <div id="grid-mesas" class="grid-mesas"></div>
+      </section>
+
+      <section id="vista-pedido" class="vista">
+        <div class="encabezado-vista">
+          <h2>Tomar pedido</h2>
+          <select id="sel-mesa" aria-label="Mesa"></select>
+        </div>
+        <div class="pedido">
+          <div id="menu" class="menu"></div>
+          <aside id="resumen" class="resumen"></aside>
+        </div>
+      </section>
+
+      <section id="vista-pedidos" class="vista">
+        <div class="encabezado-vista"><h2>Pedidos Activos</h2></div>
+        <div id="lista-pedidos" class="lista"></div>
+      </section>
+
+      <section id="vista-estadisticas" class="vista">
+        <div class="encabezado-vista"><h2>Estadísticas</h2></div>
+        <div id="stats"></div>
+      </section>
+
+      <section id="vista-historial" class="vista">
+        <div class="encabezado-vista"><h2>Historial</h2></div>
+        <div id="lista-historial" class="lista"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

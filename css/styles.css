@@ -1,0 +1,429 @@
+/* ==========================================================
+   Restaurant Manager — Claymorfismo
+   Ideas clave: fondo pastel mate, formas muy redondeadas,
+   sombra exterior suave + dos sombras internas (luz arriba-izq,
+   sombra abajo-der) que dan volumen de "plastilina".
+   ========================================================== */
+
+:root {
+  /* Paleta 60 / 30 / 10
+     Blanco roto (base, ~60 %): superficies y fondo
+     Lavanda (apoyo, ~30 %): header, login, tintes
+     Ciruela (acento, ~10 %): acciones y estados activos */
+  --ciruela: #6D28D9;
+  --ciruela-claro: #7c3aed;
+  --ciruela-oscuro: #5b21b6;
+  --ciruela-noche: #3b1a78;
+  --lavanda: #C4B5FD;
+  --lavanda-claro: #DDD3FE;
+
+  --fondo: #EFE9FD;
+  --superficie: #FAF7FF;
+  --texto: #1e1236;
+  --texto-suave: #5b5473;
+
+  --libre: #46dba0;
+  --libre-texto: #05402b;
+  --ocupada: #ff8585;
+  --ocupada-texto: #55110f;
+
+  /* Luz y sombra base (violeta-gris para que no se vea sucio) */
+  --luz: rgba(255, 255, 255, .85);
+  --sombra: rgba(84, 70, 140, .28);
+  --sombra-suave: rgba(84, 70, 140, .16);
+
+  --radio-xl: 32px;
+  --radio-lg: 24px;
+  --radio-md: 18px;
+
+  /* Receta clay para superficies claras */
+  --clay:
+    14px 14px 28px var(--sombra-suave),
+    -8px -8px 20px var(--luz),
+    inset -6px -6px 12px rgba(120, 104, 190, .16),
+    inset 6px 6px 12px var(--luz);
+  --clay-sm:
+    8px 8px 16px var(--sombra-suave),
+    -5px -5px 12px var(--luz),
+    inset -4px -4px 8px rgba(120, 104, 190, .14),
+    inset 4px 4px 8px var(--luz);
+  /* Receta clay para elementos de color: sombra del mismo tono */
+  --clay-color: inset -7px -7px 12px rgba(0, 0, 0, .18), inset 7px 7px 12px rgba(255, 255, 255, .45);
+  /* Hundido (inputs, estado activo) */
+  --clay-hundido:
+    inset 6px 6px 12px rgba(84, 70, 140, .22),
+    inset -6px -6px 12px var(--luz);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background: var(--fondo);
+  color: var(--texto);
+  min-height: 100vh;
+}
+
+.contenedor { max-width: 1100px; margin: 0 auto; padding: 0 48px; }
+
+/* ---------- Header: losa de arcilla lavanda ---------- */
+.header {
+  background: linear-gradient(135deg, var(--lavanda-claro) 0%, var(--lavanda) 55%, #b09cf9 100%);
+  color: var(--ciruela-noche);
+  padding: 26px 0 30px;
+  border-radius: 0 0 var(--radio-xl) var(--radio-xl);
+  box-shadow:
+    0 16px 30px rgba(109, 40, 217, .28),
+    inset 0 -8px 14px rgba(76, 29, 149, .28),
+    inset 0 8px 14px rgba(255, 255, 255, .35);
+}
+.header__contenido { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.logo { font-size: 1.6rem; font-weight: 700; text-shadow: 0 2px 0 rgba(255, 255, 255, .6); }
+.reloj { display: flex; align-items: center; gap: 12px; font-size: .75rem; font-weight: 500; flex-wrap: wrap; justify-content: flex-end; }
+.reloj__hora,
+.usuario-chip {
+  background: var(--ciruela-noche);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  box-shadow: inset -3px -3px 6px rgba(0, 0, 0, .3), inset 3px 3px 6px rgba(255, 255, 255, .25), 0 4px 8px rgba(60, 20, 120, .25);
+}
+.btn-salir {
+  background: rgba(255, 255, 255, .5);
+  border: none;
+  color: var(--ciruela-noche);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font: 600 .75rem 'Poppins', sans-serif;
+  cursor: pointer;
+  box-shadow: inset -3px -3px 6px rgba(76, 29, 149, .25), inset 3px 3px 6px rgba(255, 255, 255, .4);
+  transition: transform .15s, box-shadow .15s;
+}
+.btn-salir:hover { background: rgba(255, 255, 255, .75); }
+.btn-salir:active { transform: scale(.96); box-shadow: inset 3px 3px 7px rgba(76, 29, 149, .35); }
+.btn-salir:focus-visible { outline: 3px solid var(--ciruela-noche); outline-offset: 2px; }
+
+/* ---------- Navegación: pastillas de plastilina ---------- */
+.nav { background: none; padding-top: 22px; }
+.nav__contenido { display: flex; gap: 12px; flex-wrap: wrap; }
+.nav__tab {
+  background: var(--superficie);
+  border: none;
+  border-radius: 999px;
+  color: var(--texto-suave);
+  font: 600 .82rem 'Poppins', sans-serif;
+  padding: 11px 22px;
+  cursor: pointer;
+  box-shadow: var(--clay-sm);
+  transition: transform .15s, box-shadow .15s, color .15s;
+}
+.nav__tab:hover { color: var(--ciruela-noche); transform: translateY(-2px); }
+.nav__tab:active { transform: scale(.97); }
+.nav__tab.activa {
+  background: var(--ciruela);
+  color: #fff;
+  box-shadow: 6px 8px 14px rgba(109, 40, 217, .35), var(--clay-color);
+}
+.nav__tab:focus-visible { outline: 3px solid var(--ciruela-noche); outline-offset: 3px; }
+
+/* ---------- Contenido ---------- */
+.principal { padding-top: 28px; padding-bottom: 48px; }
+.vista { display: none; }
+.vista.activa { display: block; }
+
+.encabezado-vista {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  gap: 12px;
+}
+.encabezado-vista h2 { font-size: 1.3rem; font-weight: 700; color: var(--ciruela-noche); }
+
+.leyenda {
+  display: flex; gap: 16px; font-size: .75rem; font-weight: 500; color: var(--texto-suave);
+  background: var(--superficie); padding: 8px 18px; border-radius: 999px; box-shadow: var(--clay-sm);
+}
+.leyenda__item { display: flex; align-items: center; gap: 8px; }
+.punto { width: 14px; height: 14px; border-radius: 50%; display: inline-block; box-shadow: inset -2px -2px 4px rgba(0, 0, 0, .2), inset 2px 2px 4px rgba(255, 255, 255, .6); }
+.punto--libre { background: var(--libre); }
+.punto--ocupada { background: var(--ocupada); }
+
+/* ---------- Mesas: cojines de arcilla ---------- */
+.grid-mesas { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; }
+.mesa {
+  border: none;
+  border-radius: var(--radio-lg);
+  padding: 22px 8px;
+  text-align: center;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform .18s, box-shadow .18s;
+}
+.mesa--libre {
+  background: var(--libre);
+  color: var(--libre-texto);
+  box-shadow: 10px 12px 22px rgba(40, 170, 120, .35), var(--clay-color);
+}
+.mesa--ocupada {
+  background: var(--ocupada);
+  color: var(--ocupada-texto);
+  box-shadow: 10px 12px 22px rgba(230, 80, 80, .35), var(--clay-color);
+}
+.mesa:hover { transform: translateY(-4px) scale(1.02); }
+.mesa:active { transform: scale(.97); }
+.mesa:focus-visible { outline: 3px solid var(--texto); outline-offset: 4px; }
+.mesa__nombre { display: block; font-size: 1.05rem; font-weight: 700; }
+.mesa__estado { display: block; font-size: .8rem; font-weight: 500; margin-top: 4px; }
+.mesa--solo { cursor: default; }
+.mesa--solo:hover { transform: none; }
+.mesa--solo:active { transform: none; }
+
+/* ---------- Listas ---------- */
+.lista { display: flex; flex-direction: column; gap: 18px; }
+.item {
+  background: var(--superficie);
+  border-radius: var(--radio-lg);
+  padding: 18px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  box-shadow: var(--clay);
+  font-size: .9rem;
+}
+.item small { color: var(--texto-suave); }
+.btn-cobrar,
+.btn {
+  background: var(--ciruela);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-family: 'Poppins', sans-serif;
+  cursor: pointer;
+  box-shadow: 6px 8px 14px rgba(109, 40, 217, .35), var(--clay-color);
+  transition: transform .15s, box-shadow .15s;
+}
+.btn-cobrar { padding: 10px 20px; font-weight: 600; font-size: .78rem; white-space: nowrap; }
+.btn { padding: 14px 20px; font-weight: 600; font-size: .88rem; width: 100%; }
+.btn-cobrar:hover,
+.btn:hover { transform: translateY(-2px); }
+.btn-cobrar:active,
+.btn:active { transform: scale(.97); box-shadow: inset 5px 5px 10px rgba(76, 29, 149, .35), inset -3px -3px 8px rgba(255, 255, 255, .25); }
+.btn-cobrar:focus-visible,
+.btn:focus-visible { outline: 3px solid var(--ciruela-noche); outline-offset: 3px; }
+.vacio { color: var(--texto-suave); font-size: .9rem; }
+
+/* ---------- Login ---------- */
+[hidden] { display: none !important; }
+.login {
+  min-height: 100vh; display: grid; place-items: center; padding: 20px;
+  /* Arena negra: se ancla a la izquierda para que se vean las ondas y
+     el grano quede a la derecha; el resplandor ciruela separa la tarjeta */
+  background:
+    radial-gradient(ellipse 60% 55% at 50% 48%, rgba(109, 40, 217, .30) 0%, rgba(109, 40, 217, 0) 70%),
+    url('../img/fondo-login.jpg') 25% 50% / cover no-repeat,
+    #0b0a10;
+}
+.login__caja {
+  background: var(--superficie);
+  border-radius: 40px;
+  padding: 36px 32px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, .6), 0 0 50px rgba(196, 181, 253, .14), inset -8px -8px 16px rgba(120, 104, 190, .16), inset 8px 8px 16px var(--luz);
+}
+.login__caja .logo { color: var(--ciruela-noche); font-size: 1.5rem; text-shadow: none; }
+.login__sub { color: var(--texto-suave); font-size: .85rem; margin: 4px 0 20px; }
+.roles, .modos { display: flex; gap: 10px; margin-bottom: 18px; }
+.rol, .modo-btn {
+  flex: 1; border: none; background: var(--superficie); border-radius: 999px; padding: 11px;
+  font: 600 .85rem 'Poppins', sans-serif; color: var(--texto-suave); cursor: pointer;
+  box-shadow: var(--clay-sm); transition: transform .15s;
+}
+.rol:hover, .modo-btn:hover { transform: translateY(-1px); }
+.rol.activa { background: var(--ciruela); color: #fff; box-shadow: 5px 7px 12px rgba(109, 40, 217, .35), var(--clay-color); }
+.modo-btn { padding: 9px; font-size: .8rem; }
+.modo-btn.activa { background: var(--fondo); color: var(--ciruela-noche); box-shadow: var(--clay-hundido); }
+.rol:focus-visible, .modo-btn:focus-visible { outline: 3px solid var(--ciruela-noche); outline-offset: 3px; }
+.login label { display: block; font-size: .8rem; font-weight: 600; margin-bottom: 14px; color: var(--texto-suave); }
+.login input {
+  width: 100%; margin-top: 6px; padding: 13px 18px; border: none; border-radius: var(--radio-md);
+  background: var(--fondo); color: var(--texto); font: 400 .9rem 'Poppins', sans-serif;
+  box-shadow: var(--clay-hundido);
+}
+.login input:focus-visible { outline: 3px solid var(--ciruela); outline-offset: 2px; }
+.error { color: #b3261e; font-size: .8rem; font-weight: 500; min-height: 1.2em; margin-bottom: 10px; }
+
+/* ---------- Tomar pedido ---------- */
+.encabezado-vista select {
+  padding: 10px 18px; border-radius: 999px; border: none; background: var(--superficie); color: var(--texto);
+  font: 600 .85rem 'Poppins', sans-serif; box-shadow: var(--clay-sm); cursor: pointer;
+}
+.encabezado-vista select:focus-visible { outline: 3px solid var(--ciruela); outline-offset: 3px; }
+.pedido { display: grid; grid-template-columns: 1fr 310px; gap: 28px; align-items: start; }
+.menu h3, .resumen h3 { font-size: .95rem; font-weight: 700; color: var(--ciruela-noche); margin: 20px 0 12px; }
+.menu h3:first-child { margin-top: 0; }
+.menu__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+.plato {
+  background: var(--superficie); border: none; border-radius: var(--radio-md); padding: 16px; text-align: left; cursor: pointer;
+  color: var(--texto); font: 500 .85rem 'Poppins', sans-serif; box-shadow: var(--clay-sm);
+  display: flex; flex-direction: column; gap: 6px; transition: transform .15s, box-shadow .15s;
+}
+.plato:hover { transform: translateY(-3px); }
+.plato:active { transform: scale(.96); box-shadow: var(--clay-hundido); }
+.plato:focus-visible { outline: 3px solid var(--ciruela); outline-offset: 3px; }
+.plato small { color: var(--ciruela-oscuro); font-weight: 700; }
+.resumen { background: var(--superficie); border-radius: var(--radio-lg); padding: 22px; box-shadow: var(--clay); position: sticky; top: 16px; }
+.resumen h3 { margin-top: 0; }
+.linea { display: flex; justify-content: space-between; align-items: center; font-size: .85rem; padding: 10px 0; }
+.linea + .linea { border-top: 2px solid rgba(120, 104, 190, .12); }
+.mini {
+  width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--superficie); color: var(--ciruela-noche);
+  margin-left: 6px; cursor: pointer; font-weight: 700; box-shadow: var(--clay-sm); transition: transform .12s;
+}
+.mini:hover { transform: scale(1.08); }
+.mini:active { transform: scale(.92); box-shadow: var(--clay-hundido); }
+.mini:focus-visible { outline: 3px solid var(--ciruela); outline-offset: 2px; }
+.total { display: flex; justify-content: space-between; align-items: center; margin: 18px 0; padding: 12px 18px; font-size: 1rem; background: var(--fondo); border-radius: var(--radio-md); box-shadow: var(--clay-hundido); }
+
+/* ---------- Estadísticas ---------- */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 28px; }
+.stat { background: var(--superficie); border-radius: var(--radio-lg); padding: 20px; box-shadow: var(--clay); }
+.stat small { color: var(--texto-suave); display: block; font-size: .75rem; font-weight: 500; }
+.stat strong { font-size: 1.35rem; color: var(--ciruela-noche); }
+.paneles { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.panel { background: var(--superficie); border-radius: var(--radio-lg); padding: 22px; box-shadow: var(--clay); }
+.panel h3 { font-size: .95rem; font-weight: 700; color: var(--ciruela-noche); margin-bottom: 16px; }
+.barra { margin-bottom: 14px; font-size: .8rem; }
+.barra__top { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.barra__fondo { background: var(--fondo); border-radius: 99px; height: 14px; box-shadow: var(--clay-hundido); padding: 2px; }
+.barra__fondo i {
+  display: block; height: 100%; min-width: 10px; background: var(--ciruela); border-radius: 99px;
+  box-shadow: inset -2px -2px 4px rgba(76, 29, 149, .3), inset 2px 2px 4px rgba(255, 255, 255, .5);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .grid-mesas { grid-template-columns: repeat(3, 1fr); }
+  .pedido, .paneles { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .resumen { position: static; }
+}
+@media (max-width: 560px) {
+  .contenedor { padding: 0 20px; }
+  .grid-mesas { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .encabezado-vista { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .header__contenido { flex-direction: column; align-items: flex-start; }
+  .reloj { justify-content: flex-start; }
+  .item { flex-direction: column; align-items: flex-start; }
+}
+
+/* ---------- Accesibilidad: sin animaciones si el usuario lo pide ---------- */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+  .mesa:hover, .nav__tab:hover, .plato:hover, .btn:hover, .btn-cobrar:hover { transform: none; }
+}
+
+
+/* ==========================================================
+   Transiciones de botones
+   Regla clave: todas las sombras de un botón tienen 4 capas
+   (2 exteriores + 2 interiores) en el mismo orden, así el
+   navegador puede interpolar reposo → hover → presionado → activo.
+   ========================================================== */
+:root {
+  --suave: cubic-bezier(.4, 0, .2, 1);
+  --resorte: cubic-bezier(.34, 1.3, .64, 1);
+  --t: .32s;
+
+  /* Botones claros */
+  --b-reposo: 8px 8px 16px rgba(84, 70, 140, .16), -5px -5px 12px rgba(255, 255, 255, .85), inset -4px -4px 8px rgba(120, 104, 190, .14), inset 4px 4px 8px rgba(255, 255, 255, .85);
+  --b-elevado: 12px 14px 24px rgba(84, 70, 140, .24), -6px -6px 14px rgba(255, 255, 255, .95), inset -4px -4px 8px rgba(120, 104, 190, .14), inset 4px 4px 8px rgba(255, 255, 255, .85);
+  --b-hundido: 0 0 0 rgba(84, 70, 140, 0), 0 0 0 rgba(255, 255, 255, 0), inset 6px 6px 12px rgba(84, 70, 140, .24), inset -6px -6px 12px rgba(255, 255, 255, .85);
+  --b-vacio: 0 0 0 transparent, 0 0 0 transparent, inset 0 0 0 transparent, inset 0 0 0 transparent;
+
+  /* Botones ciruela */
+  --p-reposo: 6px 8px 14px rgba(109, 40, 217, .35), 0 0 0 rgba(109, 40, 217, 0), inset -7px -7px 12px rgba(0, 0, 0, .18), inset 7px 7px 12px rgba(255, 255, 255, .45);
+  --p-elevado: 8px 12px 22px rgba(109, 40, 217, .45), 0 0 0 rgba(109, 40, 217, 0), inset -7px -7px 12px rgba(0, 0, 0, .18), inset 7px 7px 12px rgba(255, 255, 255, .45);
+  --p-hundido: 0 0 0 rgba(109, 40, 217, 0), 0 0 0 rgba(109, 40, 217, 0), inset 5px 5px 10px rgba(76, 29, 149, .35), inset -4px -4px 8px rgba(255, 255, 255, .25);
+}
+
+/* Transición común */
+.nav__tab, .btn-salir, .btn-cobrar, .btn, .rol, .modo-btn, .plato, .mini, .mesa, .encabezado-vista select {
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--t) var(--suave),
+    color var(--t) var(--suave),
+    box-shadow var(--t) var(--suave),
+    transform .3s var(--resorte);
+}
+/* Al presionar entra rápido; al soltar vuelve despacio */
+.nav__tab:active, .btn-salir:active, .btn-cobrar:active, .btn:active, .rol:active,
+.modo-btn:active, .plato:active, .mini:active, .mesa:active, .encabezado-vista select:active {
+  transition-duration: .1s;
+}
+
+/* Claros: reposo → elevado → hundido */
+.nav__tab, .rol, .modo-btn, .plato, .mini, .encabezado-vista select { box-shadow: var(--b-reposo); }
+.nav__tab:hover, .rol:hover, .modo-btn:hover, .plato:hover, .mini:hover, .encabezado-vista select:hover { box-shadow: var(--b-elevado); }
+.nav__tab:active, .rol:active, .modo-btn:active, .plato:active, .mini:active, .encabezado-vista select:active {
+  box-shadow: var(--b-hundido);
+  transform: scale(.96);
+}
+
+/* Ciruela */
+.btn, .btn-cobrar { background-color: var(--ciruela); box-shadow: var(--p-reposo); }
+.btn:hover, .btn-cobrar:hover { background-color: #7c3aed; box-shadow: var(--p-elevado); }
+.btn:active, .btn-cobrar:active { box-shadow: var(--p-hundido); transform: scale(.97); }
+
+/* Salir (translúcido sobre el header) */
+.btn-salir { box-shadow: 0 0 0 transparent, 0 0 0 transparent, inset -3px -3px 6px rgba(76, 29, 149, .25), inset 3px 3px 6px rgba(255, 255, 255, .4); }
+.btn-salir:hover { box-shadow: 0 6px 12px rgba(60, 20, 120, .25), 0 0 0 transparent, inset -3px -3px 6px rgba(76, 29, 149, .25), inset 3px 3px 6px rgba(255, 255, 255, .4); }
+.btn-salir:active { box-shadow: 0 0 0 transparent, 0 0 0 transparent, inset 3px 3px 7px rgba(76, 29, 149, .35), inset -3px -3px 6px rgba(255, 255, 255, .2); transform: scale(.96); }
+
+/* Estados activos: las dos pestañas se cruzan suavemente */
+.nav__tab.activa { background: var(--ciruela); color: #fff; box-shadow: var(--p-reposo); }
+.rol.activa { background: var(--ciruela); color: #fff; box-shadow: var(--p-reposo); }
+.modo-btn.activa { background: var(--fondo); color: var(--ciruela-noche); box-shadow: var(--b-hundido); }
+
+/* Pestañas: una "gota" ciruela se desliza de una a otra */
+.nav__contenido { position: relative; }
+.nav__tab { position: relative; z-index: 1; }
+.nav__indicador {
+  position: absolute; top: 0; left: 0; z-index: 0;
+  border-radius: 999px;
+  background: var(--ciruela);
+  box-shadow: var(--p-reposo);
+  pointer-events: none;
+  transition: transform .5s var(--resorte), width .5s var(--resorte), height .3s var(--suave);
+}
+.nav__indicador.sin-animar { transition: none; }
+.con-indicador .nav__tab.activa { background-color: transparent; box-shadow: var(--b-vacio); color: #fff; }
+
+/* Mesas: el color y la sombra cambian de libre a ocupada sin saltos */
+.mesa {
+  --glow: 0, 0, 0;
+  --mesa-reposo: 10px 12px 22px rgba(var(--glow), .35), 0 0 0 rgba(var(--glow), 0), inset -7px -7px 12px rgba(0, 0, 0, .18), inset 7px 7px 12px rgba(255, 255, 255, .45);
+  --mesa-hover: 14px 18px 30px rgba(var(--glow), .45), 0 0 0 rgba(var(--glow), 0), inset -7px -7px 12px rgba(0, 0, 0, .18), inset 7px 7px 12px rgba(255, 255, 255, .45);
+  --mesa-press: 0 0 0 rgba(var(--glow), 0), 0 0 0 rgba(var(--glow), 0), inset 6px 6px 12px rgba(0, 0, 0, .22), inset -5px -5px 10px rgba(255, 255, 255, .3);
+  box-shadow: var(--mesa-reposo);
+}
+.mesa--libre { --glow: 40, 170, 120; }
+.mesa--ocupada { --glow: 230, 80, 80; }
+.mesa:hover { box-shadow: var(--mesa-hover); }
+.mesa:active { box-shadow: var(--mesa-press); }
+.mesa--solo:hover, .mesa--solo:active { box-shadow: var(--mesa-reposo); transform: none; }
+
+/* Cambio entre vistas */
+@keyframes vista-entra {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.vista.activa { animation: vista-entra .4s var(--suave) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vista.activa { animation: none; }
+  .nav__indicador { transition: none; }
+}
