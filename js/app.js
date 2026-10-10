@@ -100,6 +100,8 @@ function entrar(u) {
   sessionStorage.setItem(SES, u.usuario);
   $('pantalla-login').hidden = true;
   $('app').hidden = false;
+  const tema = document.querySelector('meta[name="theme-color"]');
+  if (tema) tema.content = '#C4B5FD';
   $('usuario-chip').textContent = `${u.usuario} · ${nombreRol(u.rol)}`;
   $('nav-tabs').innerHTML = TABS[u.rol].map(([v, t]) => `<button class="nav__tab" data-vista="${v}">${t}</button>`).join('') + '<span class="nav__indicador" aria-hidden="true"></span>';
   $('nav-tabs').classList.add('con-indicador');
