@@ -16,6 +16,7 @@ const MENU = [
 ];
 
 const TABS = {
+  superadmin: [['usuarios', 'Usuarios']],
   empleado: [['mesas', 'Mesas'], ['pedido', 'Tomar pedido'], ['pedidos', 'Pedidos Activos']],
   admin: [['mesas', 'Mesas'], ['pedidos', 'Pedidos Activos'], ['estadisticas', 'Estadísticas'], ['historial', 'Historial']]
 };
@@ -26,7 +27,10 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const moneda = (n) => n.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 const hora = (iso) => new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false });
 const plato = (id) => MENU.find((p) => p.id === id);
-const nombreRol = (r) => (r === 'admin' ? 'Administrador' : 'Empleado');
+const NOMBRES_ROL = { superadmin: 'Super-administrador', admin: 'Administrador', empleado: 'Empleado' };
+const nombreRol = (r) => NOMBRES_ROL[r] || 'Empleado';
+const ROLES = Object.keys(NOMBRES_ROL);
+const PATRON_USUARIO = /^[a-z0-9._-]{3,20}$/;
 // Hash simple solo para no guardar la clave en texto plano (no es seguridad real sin servidor)
 const hash = (s) => { let h = 5381; for (const c of s) h = ((h << 5) + h + c.charCodeAt(0)) >>> 0; return h.toString(16); };
 
@@ -58,41 +62,239 @@ function actualizarReloj() {
 actualizarReloj();
 setInterval(actualizarReloj, 1000);
 
-/* ---------- Login / registro ---------- */
-let rolElegido = 'empleado';
-let modo = 'entrar';
+/* ---------- Inicio de sesión ---------- */
+// Ya no hay registro público: las cuentas las crea el super-administrador.
+// Solo si no existe ninguno (primer uso) se muestra la configuración inicial.
+const hayAdminSup = () => datos.usuarios.some((u) => u.rol === 'superadmin');
 
-function marcar(selector, el) {
-  document.querySelectorAll(selector).forEach((b) => b.classList.toggle('activa', b === el));
+function configurarLogin() {
+  const inicial = !hayAdminSup();
+  $('login-sub').textContent = inicial
+    ? 'Configuración inicial: crea el primer super-administrador. Desde su panel podrás crear y administrar las demás cuentas.'
+    : 'Inicia sesión para continuar';
+  $('lbl-clave2').hidden = !inicial;
+  $('clave2').required = inicial;
+  $('clave').minLength = inicial ? 8 : 4;
+  $('clave').autocomplete = inicial ? 'new-password' : 'current-password';
+  $('btn-enviar').textContent = inicial ? 'Crear super-administrador' : 'Ingresar';
+  $('btn-restaurar').hidden = !inicial;
 }
-document.querySelectorAll('.rol').forEach((b) => b.addEventListener('click', () => {
-  rolElegido = b.dataset.rol; marcar('.rol', b);
-}));
-document.querySelectorAll('.modo-btn').forEach((b) => b.addEventListener('click', () => {
-  modo = b.dataset.modo; marcar('.modo-btn', b);
-  $('btn-enviar').textContent = modo === 'entrar' ? 'Ingresar' : 'Crear usuario';
-  $('clave').autocomplete = modo === 'entrar' ? 'current-password' : 'new-password';
-  $('error').textContent = '';
-}));
 
 $('form-login').addEventListener('submit', (e) => {
   e.preventDefault();
   const usuario = $('usuario').value.trim().toLowerCase();
   const clave = $('clave').value;
-  const existente = datos.usuarios.find((u) => u.usuario === usuario);
   const error = (msg) => { $('error').textContent = msg; };
 
-  if (modo === 'crear') {
-    if (existente) return error('Ese usuario ya existe. Elige otro nombre.');
-    const nuevo = { usuario, rol: rolElegido, clave: hash(usuario + clave) };
-    datos.usuarios.push(nuevo);
+  if (!hayAdminSup()) {   // configuración inicial
+    if (!PATRON_USUARIO.test(usuario)) return error('Usuario de 3 a 20 caracteres: minúsculas, números, punto, guion o guion bajo.');
+    if (clave.length < 8) return error('La contraseña debe tener al menos 8 caracteres.');
+    if (clave !== $('clave2').value) return error('Las contraseñas no coinciden.');
+    if (datos.usuarios.some((u) => u.usuario === usuario)) return error('Ese usuario ya existe. Elige otro nombre.');
+    datos.usuarios.push({ usuario, rol: 'superadmin', clave: hash(usuario + clave), creado: new Date().toISOString() });
     guardar();
-    entrar(nuevo);
-  } else {
-    if (!existente || existente.clave !== hash(usuario + clave)) return error('Usuario o contraseña incorrectos.');
-    if (existente.rol !== rolElegido) return error(`Este usuario es ${nombreRol(existente.rol).toLowerCase()}. Cambia el rol arriba.`);
-    entrar(existente);
+    $('clave2').value = '';
+    iniciarMFA(usuario);
+    return;
   }
+  const existente = datos.usuarios.find((u) => u.usuario === usuario);
+  if (!existente || existente.clave !== hash(usuario + clave)) return error('Usuario o contraseña incorrectos.');
+  iniciarMFA(existente.usuario);
+});
+
+/* ---------- Verificación en dos pasos (TOTP) ---------- */
+const MAX_INTENTOS = 5;
+const BLOQUEO_MS = 5 * 60 * 1000;
+let mfaUsuario = null;      // usuario que ya pasó la contraseña (aún sin sesión)
+let mfaSecretoTemp = null;  // secreto nuevo: solo se guarda si confirma su primer código
+let mfaCodigosTemp = null;  // códigos de recuperación recién generados
+let mfaModoRec = false;     // false = código de la app, true = código de recuperación
+
+const mfaUsuarioObj = () => datos.usuarios.find((u) => u.usuario === mfaUsuario);
+const mfaError = (msg) => { $('mfa-error').textContent = msg; };
+
+function mostrarPaso(paso) {
+  $('paso-credenciales').hidden = paso !== 'credenciales';
+  $('paso-mfa').hidden = paso !== 'mfa';
+  $('paso-clave').hidden = paso !== 'clave';
+}
+function mfaPantalla({ titulo, texto, activar = false, form = false, recuperacion = false, alternar = false }) {
+  $('mfa-titulo').textContent = titulo;
+  $('mfa-texto').textContent = texto;
+  $('mfa-activar').hidden = !activar;
+  $('form-mfa').hidden = !form;
+  $('mfa-recuperacion').hidden = !recuperacion;
+  $('mfa-alternar').hidden = !alternar;
+  $('mfa-volver').hidden = recuperacion;   // en la pantalla de códigos no se puede volver sin guardarlos
+  mfaError('');
+}
+function mfaModo(recuperacion) {
+  mfaModoRec = recuperacion;
+  const inp = $('mfa-codigo');
+  inp.value = '';
+  inp.inputMode = recuperacion ? 'text' : 'numeric';
+  inp.placeholder = recuperacion ? 'XXXXX-XXXXX' : '000000';
+  inp.autocapitalize = recuperacion ? 'characters' : 'off';
+  $('mfa-etiqueta').textContent = recuperacion ? 'Código de recuperación' : 'Código de 6 dígitos';
+  $('mfa-alternar').textContent = recuperacion ? 'Usar el código de mi app' : 'Usar un código de recuperación';
+  mfaError('');
+}
+
+async function iniciarMFA(nombre) {
+  if (!MFA.disponible()) {
+    $('error').textContent = 'Este navegador bloquea el cifrado en esta dirección. Abre la página con https:// o localhost.';
+    return;
+  }
+  mfaUsuario = nombre;
+  $('clave').value = '';
+  $('error').textContent = '';
+  mostrarPaso('mfa');
+  const u = mfaUsuarioObj();
+  if (u.mfa && u.mfa.activo) {
+    mfaPantalla({ titulo: 'Verificación en dos pasos', texto: 'Escribe el código de 6 dígitos de tu app autenticadora.', form: true, alternar: true });
+    mfaModo(false);
+    $('mfa-codigo').focus();
+  } else {
+    activarMFA();
+  }
+}
+
+function activarMFA() {
+  mfaSecretoTemp = MFA.nuevoSecreto();
+  mfaPantalla({
+    titulo: 'Activa la verificación en dos pasos',
+    texto: 'Escanea el QR con Google Authenticator, Microsoft Authenticator o Authy y escribe el código que muestre.',
+    activar: true, form: true
+  });
+  mfaModo(false);
+  $('mfa-clave').textContent = mfaSecretoTemp.match(/.{1,4}/g).join(' ').replace(/^(\S+ \S+ \S+ \S+) /, '$1\n'); // dos filas de 4 grupos
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(MFA.uri(mfaSecretoTemp, mfaUsuario, 'Restaurant Manager'));
+    qr.make();
+    $('mfa-qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+  } catch (e) {
+    $('mfa-qr').textContent = 'No se pudo dibujar el QR. Usa la clave de abajo.';
+  }
+  $('mfa-enviar').textContent = 'Activar y continuar';
+  $('mfa-codigo').focus();
+}
+
+function mostrarRecuperacion(codigos) {
+  mfaCodigosTemp = codigos;
+  mfaPantalla({
+    titulo: 'Guarda tus códigos de recuperación',
+    texto: 'Cada código sirve una sola vez si pierdes el celular. No se volverán a mostrar.',
+    recuperacion: true
+  });
+  $('mfa-codigos').innerHTML = codigos.map((c) => `<li>${c}</li>`).join('');
+}
+
+$('mfa-alternar').addEventListener('click', () => { mfaModo(!mfaModoRec); $('mfa-codigo').focus(); });
+$('mfa-volver').addEventListener('click', () => {
+  mfaSecretoTemp = null; mfaUsuario = null;
+  mostrarPaso('credenciales');
+});
+$('mfa-copiar').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(mfaCodigosTemp.join('\n')); $('mfa-copiar').textContent = '¡Copiado!'; }
+  catch (e) { $('mfa-copiar').textContent = 'No se pudo copiar'; }
+});
+$('mfa-descargar').addEventListener('click', () => {
+  const texto = `Restaurant Manager — códigos de recuperación de ${mfaUsuario}\n(cada uno sirve una sola vez)\n\n${mfaCodigosTemp.join('\n')}\n`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([texto], { type: 'text/plain' }));
+  a.download = `recuperacion-${mfaUsuario}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+$('mfa-continuar').addEventListener('click', () => {
+  const u = mfaUsuarioObj();
+  mfaCodigosTemp = null;
+  if (u) finalizarAcceso(u);
+});
+
+$('form-mfa').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const entrada = $('mfa-codigo').value;
+  const btn = $('mfa-enviar');
+  btn.disabled = true;
+  try {
+    /* A) Activación: el primer código confirma que la app quedó bien configurada */
+    if (mfaSecretoTemp) {
+      const paso = await MFA.verificar(mfaSecretoTemp, entrada, -1);
+      if (paso === null) return mfaError('Código incorrecto. Revisa que la hora de tu celular sea automática e inténtalo de nuevo.');
+      const codigos = MFA.codigosRecuperacion();
+      const hashes = await Promise.all(codigos.map(MFA.hashCodigo));
+      const u = mfaUsuarioObj();   // se busca de nuevo: otra pestaña pudo recargar los datos
+      u.mfa = { activo: true, secreto: mfaSecretoTemp, recuperacion: hashes, ultimoPaso: paso, intentos: 0, bloqueadoHasta: 0 };
+      mfaSecretoTemp = null;
+      guardar();
+      return mostrarRecuperacion(codigos);
+    }
+
+    /* B) Inicio de sesión */
+    let u = mfaUsuarioObj();
+    const ahora = Date.now();
+    if (ahora < u.mfa.bloqueadoHasta) {
+      return mfaError(`Demasiados intentos. Espera ${Math.ceil((u.mfa.bloqueadoHasta - ahora) / 60000)} min.`);
+    }
+    let pasoOk = null, indiceRec = -1;
+    if (mfaModoRec) {
+      indiceRec = u.mfa.recuperacion.indexOf(await MFA.hashCodigo(entrada));
+    } else {
+      pasoOk = await MFA.verificar(u.mfa.secreto, entrada, u.mfa.ultimoPaso);
+    }
+    u = mfaUsuarioObj();
+    const m = u.mfa;
+    const correcto = mfaModoRec ? indiceRec >= 0 : pasoOk !== null;
+
+    if (!correcto) {
+      m.intentos = (m.intentos || 0) + 1;
+      let msg = `Código incorrecto. Te quedan ${MAX_INTENTOS - m.intentos} intentos.`;
+      if (m.intentos >= MAX_INTENTOS) {
+        m.intentos = 0;
+        m.bloqueadoHasta = Date.now() + BLOQUEO_MS;
+        msg = 'Demasiados intentos. Cuenta bloqueada por 5 minutos.';
+      }
+      guardar();
+      $('mfa-codigo').value = '';
+      return mfaError(msg);
+    }
+
+    m.intentos = 0;
+    m.bloqueadoHasta = 0;
+    if (mfaModoRec) m.recuperacion.splice(indiceRec, 1); else m.ultimoPaso = pasoOk;
+    guardar();
+    finalizarAcceso(u);
+    if (mfaModoRec) setTimeout(() => alert(`Usaste un código de recuperación. Te quedan ${m.recuperacion.length}.`), 300);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ---------- Contraseña temporal: se cambia en el primer ingreso ---------- */
+function finalizarAcceso(u) {
+  if (!u.cambiarClave) return entrar(u);
+  mfaUsuario = u.usuario;
+  $('clave-error').textContent = '';
+  $('nclave').value = ''; $('nclave2').value = '';
+  mostrarPaso('clave');
+  $('nclave').focus();
+}
+$('form-clave').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const u = mfaUsuarioObj();
+  if (!u) return;
+  const n1 = $('nclave').value, n2 = $('nclave2').value;
+  const err = (m) => { $('clave-error').textContent = m; };
+  if (n1.length < 8) return err('Mínimo 8 caracteres.');
+  if (n1 !== n2) return err('Las contraseñas no coinciden.');
+  if (hash(u.usuario + n1) === u.clave) return err('La nueva contraseña debe ser distinta de la temporal.');
+  u.clave = hash(u.usuario + n1);
+  delete u.cambiarClave;
+  guardar();
+  $('nclave').value = ''; $('nclave2').value = '';
+  entrar(u);
 });
 
 function entrar(u) {
@@ -309,21 +511,222 @@ function renderStats() {
     </div>`;
 }
 
+/* ---------- Diálogo reutilizable ---------- */
+// Devuelve: null si se cancela; true si se confirma sin campo; el texto escrito si hay campo.
+function dialogo({ titulo, texto = '', etiqueta = null, tipo = 'text', valor = '', repetir = false,
+                   ok = 'Confirmar', peligro = false, cancelar = true, validar = null }) {
+  return new Promise((resolve) => {
+    const dlg = $('dialogo'), form = $('dialogo-form'), inp = $('dialogo-input'), inp2 = $('dialogo-input2');
+    const err = $('dialogo-error'), btnOk = $('dialogo-ok'), btnNo = $('dialogo-cancelar');
+    $('dialogo-titulo').textContent = titulo;
+    $('dialogo-texto').textContent = texto;
+    $('dialogo-etiqueta').textContent = etiqueta || '';
+    $('dialogo-campo').hidden = !etiqueta;
+    $('dialogo-campo2').hidden = !(etiqueta && repetir);
+    inp.type = tipo; inp.value = valor; inp2.value = '';
+    err.textContent = '';
+    btnOk.textContent = ok;
+    btnOk.classList.toggle('btn-dialogo--peligro', peligro);
+    btnNo.hidden = !cancelar;
+    let ocupado = false;
+    const cerrar = (r) => {
+      form.onsubmit = null; btnNo.onclick = null; dlg.oncancel = null;
+      if (dlg.open) dlg.close();
+      resolve(r);
+    };
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      if (ocupado) return;
+      const v = inp.value;
+      let msg = null;
+      if (etiqueta && repetir && v !== inp2.value) msg = 'Las contraseñas no coinciden.';
+      if (!msg && validar) {
+        ocupado = true; btnOk.disabled = true;
+        try { msg = await validar(v); } finally { ocupado = false; btnOk.disabled = false; }
+      }
+      if (msg) { err.textContent = msg; return; }
+      cerrar(etiqueta ? v : true);
+    };
+    btnNo.onclick = () => cerrar(null);
+    dlg.oncancel = (e) => { e.preventDefault(); cerrar(cancelar ? null : true); };   // tecla Esc
+    dlg.showModal();
+    if (etiqueta) inp.focus(); else btnOk.focus();
+  });
+}
+const aviso = (titulo, texto) => dialogo({ titulo, texto, ok: 'Entendido', cancelar: false });
+
+/* ---------- Super-administrador: usuarios ---------- */
+function claveAleatoria(n = 12) {
+  const alf = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const limite = 256 - (256 % alf.length);   // descarta bytes que sesgarían el resultado
+  const salida = [];
+  while (salida.length < n) {
+    for (const b of crypto.getRandomValues(new Uint8Array(n * 2))) {
+      if (b < limite && salida.length < n) salida.push(alf[b % alf.length]);
+    }
+  }
+  return salida.join('');
+}
+const descargar = (texto, nombre, tipo) => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([texto], { type: tipo }));
+  a.download = nombre;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+function renderUsuarios() {
+  $('lista-usuarios').innerHTML = datos.usuarios.map((u) => {
+    const yo = u.usuario === sesion.usuario;
+    const n = esc(u.usuario);
+    const mfaOk = !!(u.mfa && u.mfa.activo);
+    const acciones = yo ? '<small>Tu cuenta</small>' : `
+      <div class="acciones-fila">
+        <button type="button" class="btn-sec btn-sec--sm" data-accion="clave" data-usuario="${n}">Reiniciar contraseña</button>
+        <button type="button" class="btn-sec btn-sec--sm" data-accion="mfa" data-usuario="${n}">Reiniciar MFA</button>
+        <button type="button" class="btn-peligro btn-sec--sm" data-accion="eliminar" data-usuario="${n}">Eliminar</button>
+      </div>`;
+    return `<div class="item item--usuario">
+      <div class="usuario__info"><strong>${n}</strong>
+        <span class="etiqueta etiqueta--${u.rol}">${nombreRol(u.rol)}</span>
+        <span class="etiqueta ${mfaOk ? 'etiqueta--ok' : 'etiqueta--aviso'}">${mfaOk ? 'MFA activo' : 'MFA pendiente'}</span>
+        ${u.cambiarClave ? '<span class="etiqueta etiqueta--aviso">Contraseña temporal</span>' : ''}
+        ${u.creado ? `<br><small>Creado el ${new Date(u.creado).toLocaleDateString('es-CO')}</small>` : ''}
+      </div>${acciones}</div>`;
+  }).join('');
+}
+
+$('nu-generar').addEventListener('click', () => { $('nu-clave').value = claveAleatoria(); $('nu-clave').focus(); });
+
+$('form-nuevo').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const usuario = $('nu-usuario').value.trim().toLowerCase();
+  const clave = $('nu-clave').value;
+  const rol = $('nu-rol').value;
+  const err = (m) => { $('nu-error').textContent = m; };
+  if (!PATRON_USUARIO.test(usuario)) return err('Usuario de 3 a 20 caracteres: minúsculas, números, punto, guion o guion bajo.');
+  if (clave.length < 8) return err('La contraseña temporal debe tener al menos 8 caracteres.');
+  if (!ROLES.includes(rol)) return err('Rol no válido.');
+  if (datos.usuarios.some((u) => u.usuario === usuario)) return err('Ese usuario ya existe.');
+  datos.usuarios.push({ usuario, rol, clave: hash(usuario + clave), cambiarClave: true, creado: new Date().toISOString() });
+  guardar();
+  $('form-nuevo').reset();
+  err('');
+  renderUsuarios();
+  aviso('Usuario creado', `Entrégale a ${usuario} esta contraseña temporal por un canal seguro: ${clave}\n\nDeberá cambiarla y activar su verificación en dos pasos en el primer ingreso.`);
+});
+
+$('lista-usuarios').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-accion]');
+  if (!b) return;
+  const nombre = b.dataset.usuario, accion = b.dataset.accion;
+  if (nombre === sesion.usuario) return;   // nadie administra su propia cuenta desde aquí
+  const buscar = () => datos.usuarios.find((u) => u.usuario === nombre);   // se busca otra vez tras cada diálogo
+  if (!buscar()) return;
+
+  if (accion === 'eliminar') {
+    const ok = await dialogo({ titulo: `Eliminar a ${nombre}`, ok: 'Eliminar', peligro: true,
+      texto: 'Se borra la cuenta y esa persona ya no podrá entrar. Solo se puede deshacer restaurando una copia de seguridad.' });
+    if (!ok || !buscar()) return;
+    datos.usuarios = datos.usuarios.filter((u) => u.usuario !== nombre);
+  } else if (accion === 'mfa') {
+    const ok = await dialogo({ titulo: `Reiniciar el MFA de ${nombre}`, ok: 'Reiniciar',
+      texto: 'Se borra su verificación en dos pasos y tendrá que activarla de nuevo con un QR nuevo. Quien conozca su contraseña podría registrar su propio dispositivo: si sospechas de la cuenta, reinicia también la contraseña.' });
+    const u = buscar();
+    if (!ok || !u) return;
+    u.mfa = null;
+  } else if (accion === 'clave') {
+    const nueva = await dialogo({ titulo: `Reiniciar la contraseña de ${nombre}`, ok: 'Reiniciar', etiqueta: 'Contraseña temporal', valor: claveAleatoria(),
+      texto: 'Se asigna esta contraseña temporal. La persona deberá cambiarla al entrar. Entrégasela por un canal seguro.',
+      validar: (v) => (v.length < 8 ? 'Mínimo 8 caracteres.' : null) });
+    const u = buscar();
+    if (!nueva || !u) return;
+    u.clave = hash(nombre + nueva);
+    u.cambiarClave = true;
+  }
+  guardar();
+  renderUsuarios();
+});
+
+/* ---------- Copias de seguridad (cifradas) ---------- */
+function validarCopia(d) {
+  const ok = d && Array.isArray(d.usuarios) && Array.isArray(d.mesas) && Array.isArray(d.historial)
+    && d.mesas.length === TOTAL_MESAS
+    && d.mesas.every((m) => m && Number.isInteger(m.numero) && m.items && typeof m.items === 'object')
+    && d.usuarios.every((u) => u && typeof u.usuario === 'string' && typeof u.clave === 'string' && ROLES.includes(u.rol))
+    && new Set(d.usuarios.map((u) => u.usuario)).size === d.usuarios.length
+    && d.usuarios.some((u) => u.rol === 'superadmin');
+  if (!ok) throw new Error('ESTRUCTURA');
+  return { usuarios: d.usuarios, mesas: d.mesas, historial: d.historial };
+}
+
+$('btn-exportar').addEventListener('click', async () => {
+  const clave = await dialogo({ titulo: 'Exportar copia de seguridad', ok: 'Exportar', etiqueta: 'Contraseña de la copia', tipo: 'password', repetir: true,
+    texto: 'Se guarda un archivo cifrado con usuarios, mesas e historial. Elige una contraseña para protegerlo: si la olvidas, la copia no se puede abrir.',
+    validar: (v) => (v.length < 8 ? 'Mínimo 8 caracteres.' : null) });
+  if (!clave) return;
+  try {
+    const texto = await RESPALDO.cifrar({ usuarios: datos.usuarios, mesas: datos.mesas, historial: datos.historial }, clave);
+    descargar(texto, `restaurant-manager-copia-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+  } catch (e) {
+    aviso('No se pudo exportar', 'El navegador bloqueó el cifrado. Abre la página con https:// o localhost.');
+  }
+});
+
+// El selector de archivos se abre directamente desde el clic (los navegadores móviles lo exigen)
+const elegirCopia = () => { $('archivo-copia').value = ''; $('archivo-copia').click(); };
+$('btn-importar').addEventListener('click', elegirCopia);
+$('btn-restaurar').addEventListener('click', elegirCopia);
+
+$('archivo-copia').addEventListener('change', async (e) => {
+  const archivo = e.target.files[0];
+  if (!archivo) return;
+  if (archivo.size > 20 * 1024 * 1024) return aviso('Archivo demasiado grande', 'Esto no parece una copia de Restaurant Manager.');
+  const texto = await archivo.text();
+  const reemplaza = !!sesion || datos.usuarios.length > 0;
+  let nuevos = null;
+  const clave = await dialogo({ titulo: 'Restaurar copia de seguridad', ok: 'Restaurar', peligro: reemplaza, etiqueta: 'Contraseña de la copia', tipo: 'password',
+    texto: reemplaza
+      ? 'ATENCIÓN: se reemplazarán TODOS los datos actuales (usuarios, mesas e historial) por los de la copia.'
+      : 'Escribe la contraseña con la que se protegió la copia.',
+    validar: async (v) => {
+      try { nuevos = validarCopia(await RESPALDO.descifrar(texto, v)); return null; }
+      catch (err) { return err.message === 'CLAVE' ? 'Contraseña incorrecta o archivo dañado.' : 'El archivo no es una copia válida de Restaurant Manager.'; }
+    } });
+  if (!clave || !nuevos) return;
+  datos = nuevos;
+  guardar();
+  const yo = sesion && datos.usuarios.find((u) => u.usuario === sesion.usuario && u.rol === 'superadmin');
+  if (yo) { sesion = yo; renderTodo(); aviso('Copia restaurada', 'Los datos se restauraron correctamente.'); }
+  else { sessionStorage.removeItem(SES); location.reload(); }
+});
+
 /* ---------- Render general ---------- */
 function renderTodo() {
   if (!sesion) return;
+  if (sesion.rol === 'superadmin') { renderUsuarios(); return; }
   renderMesas();
   renderPedido();
   renderPedidos();
   if (sesion.rol === 'admin') { renderStats(); renderHistorial(); }
 }
 
-// Si el admin y un empleado están en pestañas del mismo navegador, se actualizan en vivo
+// Si varias pestañas del mismo navegador están abiertas, se actualizan en vivo.
+// Si el super-administrador elimina la cuenta de alguien con la sesión abierta, esa sesión se cierra.
 window.addEventListener('storage', (e) => {
-  if (e.key === KEY) { datos = cargar(); renderTodo(); }
+  if (e.key !== KEY && e.key !== null) return;
+  datos = cargar();
+  if (sesion) {
+    const vigente = datos.usuarios.find((u) => u.usuario === sesion.usuario);
+    if (!vigente || vigente.rol !== sesion.rol) { sessionStorage.removeItem(SES); location.reload(); return; }
+    renderTodo();
+  } else if (!$('paso-credenciales').hidden) {
+    configurarLogin();
+  }
 });
 
 /* ---------- Inicio ---------- */
+configurarLogin();
 const guardada = sessionStorage.getItem(SES);
 const usuarioGuardado = datos.usuarios.find((u) => u.usuario === guardada);
 if (usuarioGuardado) entrar(usuarioGuardado);

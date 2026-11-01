@@ -20,21 +20,60 @@
   <section id="pantalla-login" class="login">
     <div class="login__caja">
       <h1 class="logo">Restaurant Manager</h1>
-      <p class="login__sub">Elige cómo quieres ingresar</p>
-      <div class="roles">
-        <button type="button" class="rol activa" data-rol="empleado">Empleado</button>
-        <button type="button" class="rol" data-rol="admin">Administrador</button>
+      <div id="paso-credenciales">
+        <p class="login__sub" id="login-sub">Inicia sesión para continuar</p>
+        <form id="form-login">
+          <label>Usuario<input id="usuario" required autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+          <label>Contraseña<input id="clave" type="password" required minlength="4" autocomplete="current-password"></label>
+          <label id="lbl-clave2" hidden>Repite la contraseña<input id="clave2" type="password" minlength="8" autocomplete="new-password"></label>
+          <p id="error" class="error" role="alert"></p>
+          <button class="btn" id="btn-enviar">Ingresar</button>
+        </form>
+        <button type="button" class="btn-link" id="btn-restaurar" hidden>¿Tienes una copia de seguridad? Restaurar</button>
       </div>
-      <div class="modos">
-        <button type="button" class="modo-btn activa" data-modo="entrar">Iniciar sesión</button>
-        <button type="button" class="modo-btn" data-modo="crear">Crear usuario</button>
+
+      <!-- Segundo paso: verificación en dos pasos -->
+      <div id="paso-mfa" hidden>
+        <h2 class="mfa__titulo" id="mfa-titulo"></h2>
+        <p class="login__sub" id="mfa-texto"></p>
+
+        <div id="mfa-activar" hidden>
+          <div id="mfa-qr" class="mfa-qr" role="img" aria-label="Código QR para la app autenticadora"></div>
+          <p class="mfa-etq">¿No puedes escanear? Escribe esta clave en la app:</p>
+          <code id="mfa-clave" class="mfa-clave"></code>
+        </div>
+
+        <div id="mfa-recuperacion" hidden>
+          <ul id="mfa-codigos" class="mfa-codigos"></ul>
+          <div class="mfa-acciones">
+            <button type="button" class="btn-link" id="mfa-copiar">Copiar</button>
+            <button type="button" class="btn-link" id="mfa-descargar">Descargar .txt</button>
+          </div>
+          <button type="button" class="btn" id="mfa-continuar">Ya los guardé, entrar</button>
+        </div>
+
+        <form id="form-mfa" hidden>
+          <label><span id="mfa-etiqueta">Código de 6 dígitos</span>
+            <input id="mfa-codigo" class="mfa-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="11" required>
+          </label>
+          <p id="mfa-error" class="error" role="alert"></p>
+          <button class="btn" id="mfa-enviar">Verificar</button>
+          <button type="button" class="btn-link" id="mfa-alternar" hidden>Usar un código de recuperación</button>
+        </form>
+        <button type="button" class="btn-link" id="mfa-volver">← Volver</button>
       </div>
-      <form id="form-login">
-        <label>Usuario<input id="usuario" required autocomplete="username"></label>
-        <label>Contraseña<input id="clave" type="password" required minlength="4" autocomplete="current-password"></label>
-        <p id="error" class="error" role="alert"></p>
-        <button class="btn" id="btn-enviar">Ingresar</button>
-      </form>
+
+      <!-- Tercer paso: cambiar la contraseña temporal -->
+      <div id="paso-clave" hidden>
+        <h2 class="mfa__titulo">Crea tu contraseña</h2>
+        <p class="login__sub">La contraseña que recibiste es temporal. Elige una nueva (mínimo 8 caracteres).</p>
+        <form id="form-clave">
+          <label>Nueva contraseña<input id="nclave" type="password" required minlength="8" autocomplete="new-password"></label>
+          <label>Repite la contraseña<input id="nclave2" type="password" required minlength="8" autocomplete="new-password"></label>
+          <p id="clave-error" class="error" role="alert"></p>
+          <button class="btn">Guardar y entrar</button>
+        </form>
+      </div>
     </div>
   </section>
 
@@ -57,6 +96,36 @@
     </nav>
 
     <main class="contenedor principal">
+
+      <section id="vista-usuarios" class="vista">
+        <div class="encabezado-vista">
+          <h2>Usuarios</h2>
+          <div class="acciones-vista">
+            <button type="button" class="btn-sec" id="btn-exportar">Exportar copia</button>
+            <button type="button" class="btn-sec" id="btn-importar">Importar copia</button>
+          </div>
+        </div>
+        <form id="form-nuevo" class="panel form-nuevo" autocomplete="off">
+          <h3>Crear usuario</h3>
+          <div class="form-fila">
+            <label>Usuario<input id="nu-usuario" required minlength="3" maxlength="20" autocapitalize="none" spellcheck="false" placeholder="ej. maria"></label>
+            <label>Contraseña temporal<input id="nu-clave" required minlength="8" autocomplete="off" spellcheck="false" placeholder="mín. 8 caracteres"></label>
+            <label>Rol
+              <select id="nu-rol">
+                <option value="empleado">Empleado</option>
+                <option value="admin">Administrador</option>
+                <option value="superadmin">Super-administrador</option>
+              </select>
+            </label>
+          </div>
+          <p id="nu-error" class="error" role="alert"></p>
+          <div class="form-acciones">
+            <button class="btn" id="nu-crear">Crear usuario</button>
+            <button type="button" class="btn-link" id="nu-generar">Generar contraseña segura</button>
+          </div>
+        </form>
+        <div id="lista-usuarios" class="lista"></div>
+      </section>
 
       <section id="vista-mesas" class="vista">
         <div class="encabezado-vista">
@@ -98,6 +167,25 @@
     </main>
   </div>
 
+  <!-- Diálogo reutilizable (confirmaciones, contraseñas) -->
+  <dialog id="dialogo" class="dialogo" aria-labelledby="dialogo-titulo">
+    <form id="dialogo-form" novalidate>
+      <h3 id="dialogo-titulo"></h3>
+      <p id="dialogo-texto" class="dialogo__texto"></p>
+      <label id="dialogo-campo" hidden><span id="dialogo-etiqueta"></span><input id="dialogo-input" autocomplete="off" spellcheck="false" autocapitalize="none"></label>
+      <label id="dialogo-campo2" hidden><span>Repite la contraseña</span><input id="dialogo-input2" type="password" autocomplete="off"></label>
+      <p id="dialogo-error" class="error" role="alert"></p>
+      <div class="dialogo__acciones">
+        <button type="button" class="btn-sec" id="dialogo-cancelar">Cancelar</button>
+        <button class="btn-dialogo" id="dialogo-ok">Confirmar</button>
+      </div>
+    </form>
+  </dialog>
+  <input type="file" id="archivo-copia" accept=".json,application/json" hidden>
+
+  <script src="js/qrcode.js"></script>
+  <script src="js/mfa.js"></script>
+  <script src="js/respaldo.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

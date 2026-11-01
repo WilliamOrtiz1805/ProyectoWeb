@@ -493,3 +493,137 @@ button, select { touch-action: manipulation; }   /* sin retardo ni zoom por dobl
   .header { padding-top: calc(12px + env(safe-area-inset-top)); padding-bottom: 16px; }
   .principal { padding-top: 16px; }
 }
+
+
+/* ==========================================================
+   Verificación en dos pasos (MFA)
+   ========================================================== */
+.mfa__titulo { font-size: 1.15rem; font-weight: 700; color: var(--ciruela-noche); }
+.mfa-qr {
+  width: 200px; height: 200px; margin: 0 auto 14px; padding: 8px;
+  background: #fff; border-radius: var(--radio-md); box-shadow: var(--clay-hundido);
+  display: grid; place-items: center; font-size: .75rem; text-align: center; color: var(--texto-suave);
+}
+.mfa-qr svg { display: block; width: 100%; height: 100%; }
+.mfa-etq { font-size: .75rem; color: var(--texto-suave); text-align: center; }
+.mfa-clave {
+  display: block; margin: 6px 0 18px; padding: 10px 12px; text-align: center;
+  font: 600 .85rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .04em;
+  background: var(--fondo); color: var(--texto); border-radius: var(--radio-md); box-shadow: var(--clay-hundido);
+  white-space: pre-line; user-select: all;
+}
+.login .mfa-codigo { text-align: center; letter-spacing: .25em; font-size: 1.2rem; font-weight: 600; }
+.login .mfa-codigo::placeholder { letter-spacing: .15em; font-weight: 400; opacity: .45; }
+.mfa-codigos { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.mfa-codigos li {
+  font: 600 .8rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-align: center;
+  padding: 10px 4px; background: var(--fondo); border-radius: 12px; box-shadow: var(--clay-hundido); user-select: all;
+}
+.mfa-acciones { display: flex; justify-content: center; gap: 16px; margin-bottom: 14px; }
+.btn-link {
+  background: none; border: none; color: var(--ciruela-oscuro); cursor: pointer; padding: 10px 8px;
+  font: 600 .8rem 'Poppins', sans-serif; text-decoration: underline; text-underline-offset: 3px;
+  transition: color .2s; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.btn-link:focus-visible { outline: 3px solid var(--ciruela); outline-offset: 2px; border-radius: 8px; }
+#paso-mfa .btn-link:not(.mfa-acciones .btn-link) { display: block; margin: 6px auto 0; }
+#paso-mfa [hidden] { display: none !important; }
+@media (pointer: coarse) { .btn-link { min-height: 44px; } }
+
+
+/* ==========================================================
+   Super-administrador: panel de usuarios, etiquetas y diálogo
+   ========================================================== */
+.acciones-vista { display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* Botón secundario (arcilla clara) y de peligro */
+.btn-sec, .btn-peligro {
+  background-color: var(--superficie); color: var(--ciruela-oscuro); border: none; border-radius: 999px;
+  padding: 11px 20px; font: 600 .8rem 'Poppins', sans-serif; cursor: pointer; box-shadow: var(--b-reposo);
+  transition: background-color var(--t) var(--suave), color var(--t) var(--suave), box-shadow var(--t) var(--suave), transform .3s var(--resorte);
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.btn-peligro { color: #b3261e; }
+.btn-sec--sm { padding: 8px 14px; font-size: .72rem; }
+@media (hover: hover) {
+  .btn-sec:hover, .btn-peligro:hover { box-shadow: var(--b-elevado); transform: translateY(-2px); }
+}
+.btn-sec:active, .btn-peligro:active { box-shadow: var(--b-hundido); transform: scale(.96); transition-duration: .1s; }
+.btn-sec:focus-visible, .btn-peligro:focus-visible, .btn-dialogo:focus-visible { outline: 3px solid var(--ciruela); outline-offset: 3px; }
+.btn-sec:disabled, .btn-dialogo:disabled { opacity: .6; cursor: progress; }
+
+/* Formulario de nuevo usuario */
+.form-nuevo { margin-bottom: 24px; }
+.form-fila { display: grid; grid-template-columns: 1fr 1fr 190px; gap: 16px; }
+.form-nuevo label, .dialogo label { display: block; font-size: .8rem; font-weight: 600; color: var(--texto-suave); margin-bottom: 14px; }
+.form-nuevo input, .form-nuevo select, .dialogo input {
+  width: 100%; margin-top: 6px; padding: 13px 18px; border: none; border-radius: var(--radio-md);
+  background: var(--fondo); color: var(--texto); font: 400 1rem 'Poppins', sans-serif; box-shadow: var(--clay-hundido);
+  -webkit-appearance: none; appearance: none;
+}
+.form-nuevo select {
+  padding-right: 40px; cursor: pointer; font-weight: 500;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%235b21b6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 16px center; background-size: 12px 8px;
+}
+.form-nuevo input:focus-visible, .form-nuevo select:focus-visible, .dialogo input:focus-visible { outline: 3px solid var(--ciruela); outline-offset: 2px; }
+.form-nuevo input::placeholder { opacity: .5; }
+.form-acciones { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.form-acciones .btn { width: auto; padding-left: 28px; padding-right: 28px; }
+
+/* Filas de usuarios y etiquetas */
+.item--usuario { align-items: center; }
+.usuario__info { line-height: 1.9; }
+.acciones-fila { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.etiqueta {
+  display: inline-block; margin-left: 6px; padding: 2px 10px; border-radius: 999px; vertical-align: middle;
+  font-size: .68rem; font-weight: 700; background: var(--fondo); color: var(--texto-suave);
+}
+.usuario__info strong + .etiqueta { margin-left: 10px; }
+.etiqueta--superadmin { background: var(--ciruela-noche); color: #fff; }
+.etiqueta--admin { background: var(--lavanda); color: var(--ciruela-noche); }
+.etiqueta--ok { background: #d6f5e8; color: #05402b; }
+.etiqueta--aviso { background: #ffedcc; color: #6b4200; }
+
+/* Diálogo */
+.dialogo {
+  border: none; border-radius: var(--radio-xl); padding: 28px 26px 22px; background: var(--superficie); color: var(--texto);
+  margin: auto;   /* el reset global (* { margin: 0 }) anula el centrado nativo del <dialog> */
+  width: calc(100% - 32px); max-width: 440px; box-shadow: 0 30px 60px rgba(0, 0, 0, .45), inset -8px -8px 16px rgba(120, 104, 190, .16), inset 8px 8px 16px var(--luz);
+}
+.dialogo[open] { animation: dialogo-entra .28s var(--resorte) both; }
+.dialogo::backdrop { background: rgba(11, 10, 16, .62); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.dialogo h3 { font-size: 1.1rem; font-weight: 700; color: var(--ciruela-noche); margin-bottom: 8px; overflow-wrap: anywhere; }
+.dialogo__texto { font-size: .85rem; color: var(--texto-suave); margin-bottom: 18px; white-space: pre-line; overflow-wrap: anywhere; }
+.dialogo__acciones { display: flex; justify-content: flex-end; gap: 12px; margin-top: 4px; }
+.btn-dialogo {
+  background-color: var(--ciruela); color: #fff; border: none; border-radius: 999px; padding: 11px 24px;
+  font: 600 .85rem 'Poppins', sans-serif; cursor: pointer; box-shadow: var(--p-reposo);
+  transition: background-color var(--t) var(--suave), box-shadow var(--t) var(--suave), transform .3s var(--resorte);
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+@media (hover: hover) { .btn-dialogo:hover { box-shadow: var(--p-elevado); transform: translateY(-2px); } }
+.btn-dialogo:active { box-shadow: var(--p-hundido); transform: scale(.97); transition-duration: .1s; }
+.btn-dialogo--peligro {
+  background-color: #c0392b;
+  box-shadow: 6px 8px 14px rgba(192, 57, 43, .35), 0 0 0 rgba(192, 57, 43, 0), inset -7px -7px 12px rgba(0, 0, 0, .18), inset 7px 7px 12px rgba(255, 255, 255, .4);
+}
+@keyframes dialogo-entra { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+
+@media (pointer: coarse) {
+  .btn-sec, .btn-peligro, .btn-dialogo { min-height: 44px; }
+  .btn-sec--sm { min-height: 40px; }
+}
+@media (max-width: 760px) { .form-fila { grid-template-columns: 1fr; gap: 0; } }
+@media (max-width: 560px) {
+  .item--usuario { align-items: flex-start; }
+  .usuario__info { width: 100%; }
+  .acciones-vista { width: 100%; }
+  .acciones-vista .btn-sec { flex: 1 1 auto; }
+  .acciones-fila { justify-content: flex-start; width: 100%; }
+  .form-acciones .btn { width: 100%; }
+  .dialogo { padding: 24px 20px 18px; }
+  .dialogo__acciones { flex-direction: column-reverse; }
+  .dialogo__acciones > * { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .dialogo[open] { animation: none; } }
