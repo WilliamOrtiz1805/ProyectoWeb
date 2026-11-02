@@ -109,6 +109,9 @@ let mfaUsuario = null;      // usuario que ya pasó la contraseña (aún sin ses
 let mfaSecretoTemp = null;  // secreto nuevo: solo se guarda si confirma su primer código
 let mfaCodigosTemp = null;  // códigos de recuperación recién generados
 let mfaModoRec = false;     // false = código de la app, true = código de recuperación
+let mfaMetodo = 'totp';     // 'totp' (app autenticadora) o 'correo' (código por email)
+let mfaCorreoTemp = null;   // correo que se está confirmando al activar el método por correo
+let relojReenvio = null;
 
 const mfaUsuarioObj = () => datos.usuarios.find((u) => u.usuario === mfaUsuario);
 const mfaError = (msg) => { $('mfa-error').textContent = msg; };
@@ -118,9 +121,11 @@ function mostrarPaso(paso) {
   $('paso-mfa').hidden = paso !== 'mfa';
   $('paso-clave').hidden = paso !== 'clave';
 }
-function mfaPantalla({ titulo, texto, activar = false, form = false, recuperacion = false, alternar = false }) {
+function mfaPantalla({ titulo, texto, elegir = false, correo = false, activar = false, form = false, recuperacion = false, alternar = false }) {
   $('mfa-titulo').textContent = titulo;
   $('mfa-texto').textContent = texto;
+  $('mfa-elegir').hidden = !elegir;
+  $('form-correo').hidden = !correo;
   $('mfa-activar').hidden = !activar;
   $('form-mfa').hidden = !form;
   $('mfa-recuperacion').hidden = !recuperacion;
@@ -136,7 +141,10 @@ function mfaModo(recuperacion) {
   inp.placeholder = recuperacion ? 'XXXXX-XXXXX' : '000000';
   inp.autocapitalize = recuperacion ? 'characters' : 'off';
   $('mfa-etiqueta').textContent = recuperacion ? 'Código de recuperación' : 'Código de 6 dígitos';
-  $('mfa-alternar').textContent = recuperacion ? 'Usar el código de mi app' : 'Usar un código de recuperación';
+  $('mfa-alternar').textContent = recuperacion
+    ? (mfaMetodo === 'correo' ? 'Usar el código del correo' : 'Usar el código de mi app')
+    : 'Usar un código de recuperación';
+  $('mfa-reenviar').hidden = recuperacion || mfaMetodo !== 'correo';
   mfaError('');
 }
 
@@ -151,13 +159,89 @@ async function iniciarMFA(nombre) {
   mostrarPaso('mfa');
   const u = mfaUsuarioObj();
   if (u.mfa && u.mfa.activo) {
+    mfaMetodo = u.mfa.metodo === 'correo' ? 'correo' : 'totp';   // las cuentas antiguas no tienen método: son TOTP
+    if (mfaMetodo === 'correo') return pedirCodigoCorreo(u.correo, false);
     mfaPantalla({ titulo: 'Verificación en dos pasos', texto: 'Escribe el código de 6 dígitos de tu app autenticadora.', form: true, alternar: true });
     mfaModo(false);
     $('mfa-codigo').focus();
   } else {
-    activarMFA();
+    mfaPantalla({ titulo: 'Activa la verificación en dos pasos', texto: '¿Cómo quieres confirmar que eres tú cada vez que entres?', elegir: true });
+    $('elegir-correo').focus();
   }
 }
+
+/* ---------- Segundo paso por correo (EmailJS) ---------- */
+$('elegir-app').addEventListener('click', () => { mfaMetodo = 'totp'; activarMFA(); });
+$('elegir-correo').addEventListener('click', () => {
+  mfaMetodo = 'correo';
+  mfaPantalla({ titulo: 'Código por correo', texto: 'Escribe el correo donde quieres recibir los códigos. Te enviaremos uno ahora para confirmarlo.', correo: true });
+  $('correo-error').textContent = '';
+  $('mfa-correo').value = mfaUsuarioObj().correo || '';
+  $('mfa-correo').focus();
+});
+$('form-correo').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const correo = $('mfa-correo').value.trim().toLowerCase();
+  if (!CORREO.valido(correo)) { $('correo-error').textContent = 'Escribe un correo válido.'; return; }
+  pedirCodigoCorreo(correo, true);
+});
+
+const MENSAJES_CORREO = {
+  ESPERA: () => `Espera ${CORREO.segundosParaReenviar()} s para pedir otro código.`,
+  RED: () => 'Sin conexión. Revisa tu internet e inténtalo de nuevo.',
+  LIMITE: () => 'Se enviaron demasiados correos. Espera un momento e inténtalo de nuevo.',
+  SERVICIO: () => 'No se pudo enviar el correo. Inténtalo más tarde o usa un código de recuperación.',
+  CORREO: () => 'Esta cuenta no tiene un correo válido. Pide al super-administrador que reinicie tu MFA.'
+};
+
+// activando = true: se confirma un correo nuevo; false: inicio de sesión normal
+async function pedirCodigoCorreo(correo, activando) {
+  mfaCorreoTemp = activando ? correo : null;
+  const destino = CORREO.ocultar(correo || '');
+  const btn = activando ? $('correo-enviar') : null;
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try {
+    await CORREO.enviar(mfaUsuario, correo || '');
+    mfaPantalla({
+      titulo: activando ? 'Confirma tu correo' : 'Verificación en dos pasos',
+      texto: `Enviamos un código de 6 dígitos a ${destino}. Caduca en ${CORREO.MINUTOS} minutos. Revisa también la carpeta de spam.`,
+      form: true, alternar: !activando
+    });
+    mfaModo(false);
+    $('mfa-enviar').textContent = activando ? 'Confirmar y continuar' : 'Verificar';
+    iniciarReenvio();
+    $('mfa-codigo').focus();
+  } catch (err) {
+    const msg = (MENSAJES_CORREO[err.message] || MENSAJES_CORREO.SERVICIO)();
+    if (activando) { $('correo-error').textContent = msg; return; }
+    // Al entrar, si el envío falla se muestra igual el formulario: queda el código de recuperación
+    mfaPantalla({ titulo: 'Verificación en dos pasos', texto: `Tus códigos llegan a ${destino}.`, form: true, alternar: true });
+    mfaModo(false);
+    $('mfa-enviar').textContent = 'Verificar';
+    iniciarReenvio();
+    mfaError(msg);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar código'; }
+  }
+}
+
+// El botón de reenviar muestra la cuenta atrás y se activa al llegar a cero
+function iniciarReenvio() {
+  clearInterval(relojReenvio);
+  const b = $('mfa-reenviar');
+  const pintar = () => {
+    const s = CORREO.segundosParaReenviar();
+    b.disabled = s > 0;
+    b.textContent = s > 0 ? `Reenviar código (${s} s)` : 'Reenviar código';
+    if (!s) clearInterval(relojReenvio);
+  };
+  pintar();
+  relojReenvio = setInterval(pintar, 1000);
+}
+$('mfa-reenviar').addEventListener('click', () => {
+  const correo = mfaCorreoTemp || (mfaUsuarioObj() || {}).correo;
+  pedirCodigoCorreo(correo, !!mfaCorreoTemp);
+});
 
 function activarMFA() {
   mfaSecretoTemp = MFA.nuevoSecreto();
@@ -192,7 +276,9 @@ function mostrarRecuperacion(codigos) {
 
 $('mfa-alternar').addEventListener('click', () => { mfaModo(!mfaModoRec); $('mfa-codigo').focus(); });
 $('mfa-volver').addEventListener('click', () => {
-  mfaSecretoTemp = null; mfaUsuario = null;
+  mfaSecretoTemp = null; mfaUsuario = null; mfaCorreoTemp = null;
+  CORREO.limpiar();
+  clearInterval(relojReenvio);
   mostrarPaso('credenciales');
 });
 $('mfa-copiar').addEventListener('click', async () => {
@@ -219,6 +305,29 @@ $('form-mfa').addEventListener('submit', async (e) => {
   const btn = $('mfa-enviar');
   btn.disabled = true;
   try {
+    /* A2) Activación por correo: el código confirma que el correo es suyo */
+    if (mfaCorreoTemp) {
+      const r = await CORREO.verificar(mfaUsuario, entrada);
+      if (r !== 'ok') {
+        $('mfa-codigo').value = '';
+        return mfaError({
+          incorrecto: 'Código incorrecto. Revisa el correo e inténtalo de nuevo.',
+          caducado: 'El código caducó. Pide uno nuevo con "Reenviar código".',
+          agotado: 'Demasiados intentos con este código. Pide uno nuevo.',
+          'sin-codigo': 'Pide un código con "Reenviar código".'
+        }[r]);
+      }
+      const codigos = MFA.codigosRecuperacion();
+      const hashes = await Promise.all(codigos.map(MFA.hashCodigo));
+      const u = mfaUsuarioObj();
+      u.correo = mfaCorreoTemp;
+      u.mfa = { activo: true, metodo: 'correo', recuperacion: hashes, intentos: 0, bloqueadoHasta: 0 };
+      mfaCorreoTemp = null;
+      clearInterval(relojReenvio);
+      guardar();
+      return mostrarRecuperacion(codigos);
+    }
+
     /* A) Activación: el primer código confirma que la app quedó bien configurada */
     if (mfaSecretoTemp) {
       const paso = await MFA.verificar(mfaSecretoTemp, entrada, -1);
@@ -226,7 +335,7 @@ $('form-mfa').addEventListener('submit', async (e) => {
       const codigos = MFA.codigosRecuperacion();
       const hashes = await Promise.all(codigos.map(MFA.hashCodigo));
       const u = mfaUsuarioObj();   // se busca de nuevo: otra pestaña pudo recargar los datos
-      u.mfa = { activo: true, secreto: mfaSecretoTemp, recuperacion: hashes, ultimoPaso: paso, intentos: 0, bloqueadoHasta: 0 };
+      u.mfa = { activo: true, metodo: 'totp', secreto: mfaSecretoTemp, recuperacion: hashes, ultimoPaso: paso, intentos: 0, bloqueadoHasta: 0 };
       mfaSecretoTemp = null;
       guardar();
       return mostrarRecuperacion(codigos);
@@ -238,19 +347,23 @@ $('form-mfa').addEventListener('submit', async (e) => {
     if (ahora < u.mfa.bloqueadoHasta) {
       return mfaError(`Demasiados intentos. Espera ${Math.ceil((u.mfa.bloqueadoHasta - ahora) / 60000)} min.`);
     }
-    let pasoOk = null, indiceRec = -1;
+    let pasoOk = null, indiceRec = -1, resCorreo = null;
     if (mfaModoRec) {
       indiceRec = u.mfa.recuperacion.indexOf(await MFA.hashCodigo(entrada));
+    } else if (mfaMetodo === 'correo') {
+      resCorreo = await CORREO.verificar(u.usuario, entrada);
     } else {
       pasoOk = await MFA.verificar(u.mfa.secreto, entrada, u.mfa.ultimoPaso);
     }
     u = mfaUsuarioObj();
     const m = u.mfa;
-    const correcto = mfaModoRec ? indiceRec >= 0 : pasoOk !== null;
+    const correcto = mfaModoRec ? indiceRec >= 0 : mfaMetodo === 'correo' ? resCorreo === 'ok' : pasoOk !== null;
 
     if (!correcto) {
       m.intentos = (m.intentos || 0) + 1;
       let msg = `Código incorrecto. Te quedan ${MAX_INTENTOS - m.intentos} intentos.`;
+      if (resCorreo === 'caducado') msg = 'El código caducó. Pide uno nuevo con "Reenviar código".';
+      if (resCorreo === 'agotado' || resCorreo === 'sin-codigo') msg = 'Pide un código nuevo con "Reenviar código".';
       if (m.intentos >= MAX_INTENTOS) {
         m.intentos = 0;
         m.bloqueadoHasta = Date.now() + BLOQUEO_MS;
@@ -263,8 +376,9 @@ $('form-mfa').addEventListener('submit', async (e) => {
 
     m.intentos = 0;
     m.bloqueadoHasta = 0;
-    if (mfaModoRec) m.recuperacion.splice(indiceRec, 1); else m.ultimoPaso = pasoOk;
+    if (mfaModoRec) m.recuperacion.splice(indiceRec, 1); else if (mfaMetodo === 'totp') m.ultimoPaso = pasoOk;
     guardar();
+    clearInterval(relojReenvio);
     finalizarAcceso(u);
     if (mfaModoRec) setTimeout(() => alert(`Usaste un código de recuperación. Te quedan ${m.recuperacion.length}.`), 300);
   } finally {
@@ -302,8 +416,9 @@ function entrar(u) {
   sessionStorage.setItem(SES, u.usuario);
   $('pantalla-login').hidden = true;
   $('app').hidden = false;
+  $('login-escena')?.remove();   // la escena 3D ya no se ve: se quita para liberar la GPU
   const tema = document.querySelector('meta[name="theme-color"]');
-  if (tema) tema.content = '#C4B5FD';
+  if (tema) tema.content = '#141414';
   $('usuario-chip').textContent = `${u.usuario} · ${nombreRol(u.rol)}`;
   $('nav-tabs').innerHTML = TABS[u.rol].map(([v, t]) => `<button class="nav__tab" data-vista="${v}">${t}</button>`).join('') + '<span class="nav__indicador" aria-hidden="true"></span>';
   $('nav-tabs').classList.add('con-indicador');
@@ -580,6 +695,7 @@ function renderUsuarios() {
     const yo = u.usuario === sesion.usuario;
     const n = esc(u.usuario);
     const mfaOk = !!(u.mfa && u.mfa.activo);
+    const metodo = mfaOk ? (u.mfa.metodo === 'correo' ? 'MFA por correo' : 'MFA con app') : 'MFA pendiente';
     const acciones = yo ? '<small>Tu cuenta</small>' : `
       <div class="acciones-fila">
         <button type="button" class="btn-sec btn-sec--sm" data-accion="clave" data-usuario="${n}">Reiniciar contraseña</button>
@@ -589,8 +705,9 @@ function renderUsuarios() {
     return `<div class="item item--usuario">
       <div class="usuario__info"><strong>${n}</strong>
         <span class="etiqueta etiqueta--${u.rol}">${nombreRol(u.rol)}</span>
-        <span class="etiqueta ${mfaOk ? 'etiqueta--ok' : 'etiqueta--aviso'}">${mfaOk ? 'MFA activo' : 'MFA pendiente'}</span>
+        <span class="etiqueta ${mfaOk ? 'etiqueta--ok' : 'etiqueta--aviso'}">${metodo}</span>
         ${u.cambiarClave ? '<span class="etiqueta etiqueta--aviso">Contraseña temporal</span>' : ''}
+        ${u.correo ? `<br><small>${esc(u.correo)}</small>` : ''}
         ${u.creado ? `<br><small>Creado el ${new Date(u.creado).toLocaleDateString('es-CO')}</small>` : ''}
       </div>${acciones}</div>`;
   }).join('');
@@ -603,12 +720,14 @@ $('form-nuevo').addEventListener('submit', (e) => {
   const usuario = $('nu-usuario').value.trim().toLowerCase();
   const clave = $('nu-clave').value;
   const rol = $('nu-rol').value;
+  const correo = $('nu-correo').value.trim().toLowerCase();
   const err = (m) => { $('nu-error').textContent = m; };
+  if (correo && !CORREO.valido(correo)) return err('El correo no es válido.');
   if (!PATRON_USUARIO.test(usuario)) return err('Usuario de 3 a 20 caracteres: minúsculas, números, punto, guion o guion bajo.');
   if (clave.length < 8) return err('La contraseña temporal debe tener al menos 8 caracteres.');
   if (!ROLES.includes(rol)) return err('Rol no válido.');
   if (datos.usuarios.some((u) => u.usuario === usuario)) return err('Ese usuario ya existe.');
-  datos.usuarios.push({ usuario, rol, clave: hash(usuario + clave), cambiarClave: true, creado: new Date().toISOString() });
+  datos.usuarios.push({ usuario, rol, clave: hash(usuario + clave), cambiarClave: true, creado: new Date().toISOString(), ...(correo && { correo }) });
   guardar();
   $('form-nuevo').reset();
   err('');
@@ -631,7 +750,7 @@ $('lista-usuarios').addEventListener('click', async (e) => {
     datos.usuarios = datos.usuarios.filter((u) => u.usuario !== nombre);
   } else if (accion === 'mfa') {
     const ok = await dialogo({ titulo: `Reiniciar el MFA de ${nombre}`, ok: 'Reiniciar',
-      texto: 'Se borra su verificación en dos pasos y tendrá que activarla de nuevo con un QR nuevo. Quien conozca su contraseña podría registrar su propio dispositivo: si sospechas de la cuenta, reinicia también la contraseña.' });
+      texto: 'Se borra su verificación en dos pasos y tendrá que activarla de nuevo (por correo o con un QR nuevo). Quien conozca su contraseña podría registrar su propio dispositivo: si sospechas de la cuenta, reinicia también la contraseña.' });
     const u = buscar();
     if (!ok || !u) return;
     u.mfa = null;

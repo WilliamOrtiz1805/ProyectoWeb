@@ -1,0 +1,78 @@
+<!--
+  Plantilla de EmailJS: código de verificación de Restaurant Manager.
+  Se pega completa en EmailJS > Email Templates > Content (modo código).
+  Variables que envía la app:
+    {{usuario}}  nombre de usuario que inicia sesión
+    {{codigo}}   código de 6 dígitos
+    {{minutos}}  minutos que dura el código
+  ({{to_email}} no va aquí: se pone en el campo "To Email" de la plantilla.)
+  Los correos no aceptan CSS externo: todo va con tablas y estilos en línea.
+-->
+<div style="margin:0;padding:0;background-color:#141414;" bgcolor="#141414">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#141414" style="background-color:#141414;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;">
+
+          <!-- Logo -->
+          <tr>
+            <td style="padding:0 4px 24px;font-family:Sora,'Segoe UI',Arial,sans-serif;font-size:18px;font-weight:700;letter-spacing:-0.5px;color:#f5f5f5;text-transform:uppercase;">
+              Restaurant <span style="color:#18e912;">Manager</span>
+            </td>
+          </tr>
+
+          <!-- Tarjeta -->
+          <tr>
+            <td bgcolor="#1a1a1a" style="background-color:#1a1a1a;border:1px solid #333333;border-radius:16px;padding:36px 32px;">
+
+              <p style="margin:0 0 8px;font-family:Sora,'Segoe UI',Arial,sans-serif;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#999999;">
+                Verificación en dos pasos
+              </p>
+              <h1 style="margin:0 0 16px;font-family:Sora,'Segoe UI',Arial,sans-serif;font-size:24px;font-weight:700;letter-spacing:-0.5px;color:#f5f5f5;">
+                Hola, {{usuario}}
+              </h1>
+              <p style="margin:0 0 28px;font-family:Sora,'Segoe UI',Arial,sans-serif;font-size:15px;line-height:24px;font-weight:300;color:#bbbbbb;">
+                Usa este código para terminar de iniciar sesión:
+              </p>
+
+              <!-- Código -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" bgcolor="#0f1f0f" style="background-color:#0f1f0f;border:1px solid #1d6e1a;border-radius:10px;padding:22px 12px;">
+                    <span style="font-family:'Courier New',Consolas,monospace;font-size:36px;font-weight:700;letter-spacing:10px;color:#18e912;">{{codigo}}</span>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:28px 0 0;font-family:Sora,'Segoe UI',Arial,sans-serif;font-size:14px;line-height:22px;font-weight:300;color:#bbbbbb;">
+                El código caduca en <strong style="color:#f5f5f5;font-weight:600;">{{minutos}} minutos</strong> y solo se puede usar una vez.
+              </p>
+
+              <!-- Aviso -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px;">
+                <tr>
+                  <td style="border-top:1px solid #333333;padding-top:20px;font-family:Sora,'Segoe UI',Arial,sans-serif;font-size:13px;line-height:20px;font-weight:300;color:#999999;">
+                    ¿No fuiste tú? Ignora este correo: sin el código nadie puede entrar.
+                    Te recomendamos cambiar tu contraseña. Nunca compartas este código con nadie.
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Pie -->
+          <tr>
+            <td align="center" style="padding:24px 4px 0;font-family:Sora,'Segoe UI',Arial,sans-serif;font-size:11px;line-height:18px;font-weight:300;color:#666666;">
+              Proyecto Web UNIMINUTO · Restaurant Manager<br>
+              Correo automático, no respondas a este mensaje.
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</div>
