@@ -56,7 +56,7 @@ button, input, select { font-family: inherit; }
 /* ---------- Animaciones de entrada ---------- */
 @keyframes fade-up {
   0% { opacity: 0; transform: translateY(20px); filter: blur(4px); }
-  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+  100% { opacity: 1; transform: none; filter: none; }   /* none: al terminar, el texto no sigue costando GPU */
 }
 @keyframes fade-in { 0% { opacity: 0; } 100% { opacity: 1; } }
 .animate-fade-up { opacity: 0; animation: fade-up .7s var(--salida) forwards; }
@@ -249,8 +249,18 @@ button, input, select { font-family: inherit; }
   /* Los márgenes verticales dependen del alto de la ventana: en pantallas bajas todo cabe sin bajar */
   padding: clamp(72px, 12vh, 120px) max(64px, env(safe-area-inset-right)) max(clamp(20px, 5vh, 40px), env(safe-area-inset-bottom)) max(64px, env(safe-area-inset-left));
 }
-.login__escena { position: absolute; inset: 0; }
-.login__escena spline-viewer { display: block; width: 100%; height: 100%; }
+/* Fondo estático: es lo que se ve antes del 3D y en equipos que no lo mueven bien */
+.login__escena {
+  --escala: 1;
+  position: absolute; inset: 0; overflow: hidden;
+  background:
+    radial-gradient(ellipse 55% 45% at 72% 42%, hsl(var(--primary) / .07), transparent 70%),
+    repeating-linear-gradient(0deg, hsl(0 0% 100% / .035) 0 1px, transparent 1px 88px),
+    repeating-linear-gradient(90deg, hsl(0 0% 100% / .035) 0 1px, transparent 1px 88px),
+    linear-gradient(135deg, hsl(0 0% 13%), hsl(var(--hero-bg)) 60%);
+}
+.login__escena canvas { display: block; width: 100%; height: 100%; opacity: 0; transition: opacity .9s ease-out; }
+.login__escena canvas.lista { opacity: 1; }
 .login__velo { position: absolute; inset: 0; z-index: 1; background: rgb(0 0 0 / .3); pointer-events: none; }
 
 .login__nav {
@@ -278,8 +288,8 @@ button, input, select { font-family: inherit; }
 
 .login__caja {
   position: relative; z-index: 10; width: 100%;
-  background: hsl(var(--background) / .72);
-  backdrop-filter: blur(16px) saturate(1.2); -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  /* Casi opaca y sin backdrop-filter: desenfocar el 3D en cada cuadro es muy costoso */
+  background: hsl(var(--background) / .94);
   border: 1px solid hsl(0 0% 100% / .08); border-radius: calc(var(--radius) + 8px);
   padding: clamp(20px, 4vh, 32px) 30px;
   box-shadow: 0 30px 80px rgb(0 0 0 / .5);

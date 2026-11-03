@@ -13,17 +13,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
-  <!-- Visor de Spline como web component: el fondo 3D del acceso sin React -->
-  <script type="module" src="https://unpkg.com/@splinetool/viewer@2.0.62/build/spline-viewer.js"></script>
 </head>
 <body>
 
   <!-- Pantalla de acceso -->
   <section id="pantalla-login" class="login">
-    <!-- Escena 3D de fondo; el velo oscurece y deja pasar el ratón -->
-    <div class="login__escena" id="login-escena">
-      <spline-viewer url="https://prod.spline.design/Slk6b8kz3LRlKiyk/scene.splinecode" loading-anim-type="none"></spline-viewer>
-    </div>
+    <!-- Fondo estático de CSS; js/escena3d.js le añade encima el muro de cubos en WebGL -->
+    <div class="login__escena" id="login-escena"></div>
     <div class="login__velo"></div>
 
     <header class="login__nav animate-fade-in">
@@ -229,5 +225,6 @@
   <script src="js/respaldo.js"></script>
   <script src="js/correo.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/escena3d.js"></script>
 </body>
 </html>
